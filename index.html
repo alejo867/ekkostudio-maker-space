@@ -1,59 +1,977 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Maker Space</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>EkkoStudio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#111;overflow:hidden;font-family:system-ui,sans-serif;}
+#c{display:block;width:100vw;height:100vh;}
+
+#errBox{display:none;position:fixed;inset:0;background:#000;color:#f55;
+  z-index:9999;padding:40px;font-family:monospace;font-size:13px;
+  white-space:pre-wrap;overflow:auto;}
+
+/* INTRO — pointer-events:none so canvas click always reaches canvas */
+#intro{position:fixed;inset:0;z-index:1000;background:#0d0a07;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity 1.2s ease;
+  pointer-events:none;} /* ← KEY FIX: never blocks clicks to canvas */
+.logo{font-size:clamp(3rem,9vw,6.5rem);font-weight:900;letter-spacing:.15em;
+  text-transform:uppercase;color:#f2ead8;margin-bottom:.15em;}
+.logo em{color:#c4622d;font-style:normal;}
+.sub{font-size:.78rem;letter-spacing:.32em;text-transform:uppercase;
+  color:#5a4030;margin-bottom:2.5rem;}
+.keys{display:grid;grid-template-columns:repeat(2,1fr);gap:.45rem 1.6rem;
+  margin-bottom:1.8rem;max-width:310px;}
+.krow{display:flex;align-items:center;gap:.5rem;color:#a08060;font-size:.76rem;}
+kbd{background:#1e1408;border:1px solid #4a2e10;border-radius:4px;
+  padding:2px 7px;font-family:monospace;font-size:.76em;color:#e8a030;}
+.note{color:#3a2818;font-size:.7rem;}
+
+/* HUD */
+#hud{position:fixed;top:14px;left:14px;z-index:500;
+  display:flex;flex-direction:column;gap:7px;}
+.hb{background:rgba(12,8,4,.9);border:1px solid #4a3020;color:#c0a878;
+  padding:6px 15px;border-radius:6px;font-size:.74rem;letter-spacing:.05em;
+  cursor:pointer;font-family:inherit;transition:.15s;}
+.hb:hover{border-color:#c4622d;color:#e8a030;}
+
+#sname{position:fixed;top:14px;left:50%;transform:translateX(-50%);
+  font-size:1.1rem;font-weight:900;letter-spacing:.22em;text-transform:uppercase;
+  color:rgba(242,234,216,.38);z-index:500;pointer-events:none;}
+#sname em{color:#c4622d;font-style:normal;}
+
+#tourBtn{position:fixed;bottom:20px;right:20px;z-index:500;
+  background:rgba(12,8,4,.9);border:1px solid #c4622d;color:#e8a030;
+  padding:9px 18px;border-radius:7px;font-size:.74rem;letter-spacing:.07em;
+  cursor:pointer;font-family:inherit;transition:.15s;}
+#tourBtn:hover,#tourBtn.on{background:rgba(196,98,45,.2);}
+
+#banner{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:rgba(12,8,4,.9);border:1px solid #c4622d;color:#e8a030;
+  padding:9px 22px;border-radius:30px;font-size:.76rem;z-index:800;
+  pointer-events:none;letter-spacing:.05em;}
+
+#prompt{display:none;position:fixed;bottom:66px;left:50%;transform:translateX(-50%);
+  background:rgba(12,8,4,.9);border:1px solid #6a4020;color:#f2ead8;
+  padding:8px 20px;border-radius:20px;font-size:.76rem;z-index:700;pointer-events:none;}
+
+#tlabel{display:none;position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-90px);
+  font-size:1.8rem;font-weight:900;letter-spacing:.18em;text-transform:uppercase;
+  color:#e8a030;pointer-events:none;z-index:600;
+  text-shadow:0 2px 30px rgba(232,160,48,.5);}
+
+#xh{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  pointer-events:none;z-index:600;}
+#xh::before,#xh::after{content:'';position:absolute;background:rgba(255,255,255,.55);}
+#xh::before{width:14px;height:1px;top:0;left:-7px;}
+#xh::after{width:1px;height:14px;top:-7px;left:0;}
+
+/* MINIMAP */
+#mm{position:fixed;top:14px;right:14px;z-index:500;
+  border:1px solid #4a3020;border-radius:7px;overflow:hidden;
+  background:#0a0806;width:130px;height:130px;}
+#mmLbl{position:absolute;top:3px;left:0;right:0;text-align:center;
+  color:#c4622d;font-size:.54rem;letter-spacing:.13em;pointer-events:none;}
+
+/* MODAL */
+#modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);
+  z-index:2000;align-items:center;justify-content:center;}
+#modal.open{display:flex;}
+#mbox{background:#130f0a;border:1px solid #5a3820;border-radius:12px;
+  width:min(470px,92vw);max-height:86vh;overflow-y:auto;padding:26px 24px;
+  position:relative;box-shadow:0 0 60px rgba(196,98,45,.12);}
+#mbox::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,transparent,#c4622d,#e8a030,transparent);
+  border-radius:12px 12px 0 0;}
+.ms{font-size:.63rem;letter-spacing:.2em;text-transform:uppercase;
+  color:#c4622d;margin-bottom:.28em;}
+.mt{font-size:1.85rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;
+  color:#f2ead8;margin-bottom:.25em;}
+.md{color:#8a9aaa;font-size:.8rem;line-height:1.6;margin-bottom:1.3rem;}
+.mp{display:flex;flex-direction:column;gap:9px;}
+.mpr{background:#1e1610;border:1px solid #3a2618;border-radius:8px;
+  padding:12px 14px;display:flex;justify-content:space-between;
+  align-items:center;gap:12px;transition:border-color .2s;}
+.mpr:hover{border-color:#c4622d;}
+.pname{color:#f2ead8;font-size:.84rem;font-weight:600;margin-bottom:.13em;}
+.pdesc{color:#6a5a48;font-size:.71rem;line-height:1.4;}
+.pright{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;}
+.pprice{color:#e8a030;font-size:.86rem;font-weight:600;white-space:nowrap;}
+.pbtn{background:#c4622d;color:#fff;border:none;border-radius:5px;
+  padding:5px 11px;font-size:.69rem;cursor:pointer;white-space:nowrap;font-family:inherit;}
+.pbtn:hover{background:#d47240;}
+#mcls{position:absolute;top:11px;right:14px;background:none;border:none;
+  color:#5a4a38;font-size:1.2rem;cursor:pointer;}
+#mcls:hover{color:#f2ead8;}
+</style>
 </head>
 <body>
-    <div id="makerSpaceContainer" style="width: 100%; height: 100vh;"></div>
-    <script>
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('makerSpaceContainer').appendChild(renderer.domElement);
+<canvas id="c"></canvas>
+<div id="errBox"></div>
 
-        // Aisle
-        const aisleGeometry = new THREE.BoxGeometry(2, 1, 10);
-        const aisleMaterial = new THREE.MeshBasicMaterial({color: 0xCCCCCC});
-        const aisle = new THREE.Mesh(aisleGeometry, aisleMaterial);
-        aisle.position.z = 0;
-        scene.add(aisle);
+<div id="intro">
+  <div class="logo">Ekko<em>Studio</em></div>
+  <div class="sub">Creative Maker's Space · Redmond, WA</div>
+  <div class="keys">
+    <div class="krow"><kbd>W A S D</kbd> Move</div>
+    <div class="krow"><kbd>Mouse</kbd> Look</div>
+    <div class="krow"><kbd>Shift</kbd> Sprint</div>
+    <div class="krow"><kbd>E / Click</kbd> Interact</div>
+    <div class="krow"><kbd>R</kbd> Reset</div>
+    <div class="krow"><kbd>ESC</kbd> Unlock</div>
+  </div>
+  <div class="note">👆 Click the scene to activate mouse-look &amp; audio</div>
+</div>
 
-        // Stations
-        const stations = [
-            { name: '3D Printing', position: [-4.0, 0, 0], rotation: Math.PI / 2 },
-            { name: 'Clay Jewelry', position: [2.0, 0, 0], rotation: Math.PI / 2 },
-            { name: 'Cricut', position: [0.5, 0, 0], rotation: Math.PI / 2 },
-            { name: 'Candles', position: [2.5, 0, 0], rotation: Math.PI / 2 }
-        ];
+<div id="banner">👆 Click scene to enable mouse-look + audio</div>
+<div id="sname">Ekko<em>Studio</em></div>
+<div id="xh"></div>
+<div id="prompt"></div>
+<div id="tlabel"></div>
 
-        stations.forEach(station => {
-            const stationGeometry = new THREE.BoxGeometry(1, 1, 1);
-            const stationMaterial = new THREE.MeshBasicMaterial({color: 0x008000});
-            const stationMesh = new THREE.Mesh(stationGeometry, stationMaterial);
-            stationMesh.position.set(...station.position);
-            stationMesh.rotation.y = station.rotation;
-            scene.add(stationMesh);
-        });
+<div id="hud">
+  <button class="hb" id="resetBtn">↺ Reset (R)</button>
+  <button class="hb" id="soundBtn">♪ Sound</button>
+</div>
+<button id="tourBtn">✦ Guided Tour</button>
 
-        // Lighting
-        const light = new THREE.AmbientLight(0x404040);
-        scene.add(light);
+<div id="mm">
+  <canvas id="mmC" width="126" height="126"></canvas>
+  <div id="mmLbl">STUDIO MAP</div>
+</div>
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(10, 10, 10);
-        scene.add(directionalLight);
+<div id="modal">
+  <div id="mbox">
+    <button id="mcls">✕</button>
+    <div class="ms" id="mst"></div>
+    <div class="mt" id="mti"></div>
+    <div class="md" id="mde"></div>
+    <div class="mp" id="mpr"></div>
+  </div>
+</div>
 
-        camera.position.z = 5;
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script>
+'use strict';
 
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
-        animate();
-    </script>
+window.onerror = function(m,s,l,c,e){
+  var b = document.getElementById('errBox');
+  b.style.display = 'block';
+  b.textContent = 'ERROR: '+m+'\n'+s+':'+l+'\n'+(e ? e.stack : '');
+};
+
+// ─── STATION DATA ────────────────────────────────────────────────────────────
+var STATIONS = [
+  { id:0, name:'3D Printing',    icon:'🖨',  col:0x2a7fc4, hex:'#2a7fc4',
+    pos:{x:-2.8, z:-2.0},
+    desc:'Precision FDM & resin prints — custom parts, art pieces, and functional prototypes made to order.',
+    products:[
+      {name:'Custom Miniature Figure', price:'$24', desc:'Detailed resin print. Specify your design or character.'},
+      {name:'Geometric Planter 6"',    price:'$18', desc:'PLA with food-safe coating. Multiple colorways.'},
+      {name:'Personalized Keychain ×3',price:'$9',  desc:'Name or logo in durable PETG. Pack of 3.'},
+    ]
+  },
+  { id:1, name:'Clay Jewelry',   icon:'🪨',  col:0xc47a3a, hex:'#c47a3a',
+    pos:{x:2.8, z:-2.0},
+    desc:'Handcrafted polymer clay earrings, pendants, and statement pieces. Every piece is one of a kind.',
+    products:[
+      {name:'Terrazzo Stud Earrings',   price:'$16', desc:'Lightweight clay with gold leaf flecks. Hypoallergenic posts.'},
+      {name:'Abstract Pendant Necklace',price:'$28', desc:'Sculptural focal piece on an 18" gold-fill chain.'},
+      {name:'Clay Ring Set ×3',          price:'$22', desc:'Stacking rings in earth tones. One-size adjustable.'},
+    ]
+  },
+  { id:2, name:'Cricut Designs', icon:'✂',  col:0x2ab89a, hex:'#2ab89a',
+    pos:{x:-2.8, z:2.0},
+    desc:'Precision-cut vinyl decals, iron-on graphics, and custom paper crafts with a personal touch.',
+    products:[
+      {name:'Custom Vinyl Decal',         price:'$8',  desc:'Weather-resistant outdoor vinyl. Up to 6". Choose your design.'},
+      {name:'Iron-On Shirt Graphic',      price:'$14', desc:'HTV transfer for standard tee. Provide art or choose from ours.'},
+      {name:'Personalized Gift Box Wrap', price:'$12', desc:'Scored & cut kraft paper with custom name or message.'},
+    ]
+  },
+  { id:3, name:'Candle Making',  icon:'🕯',  col:0xe8c040, hex:'#e8c040',
+    pos:{x:2.8, z:2.0},
+    desc:'Hand-poured soy and coconut wax candles. Clean burns, complex scents, beautiful vessels worth keeping.',
+    products:[
+      {name:'Signature Soy Candle 8oz', price:'$22', desc:'Cedar + tonka bean. 45-hr burn. Amber glass vessel.'},
+      {name:'Mini Tin Set 3×2oz',       price:'$18', desc:'Three seasonal scents: citrus, smoke, vanilla. Travel-friendly.'},
+      {name:'Custom Scent Blend',       price:'$30', desc:'Design your own fragrance. 8oz pour, made to order.'},
+    ]
+  },
+];
+
+// ─── RENDERER ────────────────────────────────────────────────────────────────
+var canvas = document.getElementById('c');
+var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+window.addEventListener('resize', function() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  cam.aspect = window.innerWidth / window.innerHeight;
+  cam.updateProjectionMatrix();
+});
+
+// ─── SCENE + CAMERA ──────────────────────────────────────────────────────────
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0a07);
+scene.fog = new THREE.Fog(0x0d0a07, 10, 22);
+
+var cam = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 30);
+cam.rotation.order = 'YXZ';
+
+// Start outside the door, facing into the room (door is at z=+5)
+var START_X=0, START_Y=1.72, START_Z=6.5, START_YAW=Math.PI;
+cam.position.set(START_X, START_Y, START_Z);
+cam.rotation.set(0, START_YAW, 0);
+
+// ─── PLAYER STATE ────────────────────────────────────────────────────────────
+var pyaw = START_YAW, ppitch = 0;
+var px = START_X, py = START_Y, pz = START_Z;
+
+var keys = {};
+document.addEventListener('keydown', function(e){ keys[e.code] = true; });
+document.addEventListener('keyup',   function(e){ keys[e.code] = false; });
+
+function resetPlayer() {
+  px=START_X; py=START_Y; pz=START_Z;
+  pyaw=START_YAW; ppitch=0;
+  cam.position.set(px,py,pz);
+  cam.rotation.set(0,pyaw,0);
+  stopTour();
+}
+document.getElementById('resetBtn').addEventListener('click', resetPlayer);
+document.addEventListener('keydown', function(e){ if(e.code==='KeyR') resetPlayer(); });
+
+// ─── POINTER LOCK ────────────────────────────────────────────────────────────
+// FIX: mousemove runs whenever locked=true, regardless of intro state.
+// introGone only gates the "open catalog on click" action, not camera look.
+var locked = false;
+var banner = document.getElementById('banner');
+
+canvas.addEventListener('click', function() {
+  startAudio();
+  if (!locked) {
+    var req = canvas.requestPointerLock();
+    if (req && req.catch) req.catch(function(){});
+  }
+});
+
+document.addEventListener('pointerlockchange', function() {
+  locked = document.pointerLockElement === canvas;
+  // Show/hide banner whenever lock state changes
+  banner.style.display = locked ? 'none' : 'block';
+});
+
+// FIX: NO introGone check here — mouse always works once pointer lock is active
+document.addEventListener('mousemove', function(e) {
+  if (!locked) return;
+  pyaw   -= e.movementX * 0.002;
+  ppitch -= e.movementY * 0.002;
+  ppitch = Math.max(-1.1, Math.min(1.1, ppitch));
+  cam.rotation.set(ppitch, pyaw, 0);
+});
+
+// ─── INTRO ───────────────────────────────────────────────────────────────────
+// Intro is purely visual (pointer-events:none in CSS), never blocks interaction.
+// We still fade it out so the room becomes visible.
+var introGone = false;
+var introEl = document.getElementById('intro');
+setTimeout(function() {
+  introEl.style.opacity = '0';
+  setTimeout(function() {
+    introEl.style.display = 'none';
+    introGone = true;
+  }, 1200);
+}, 4000);
+
+// ─── AUDIO ───────────────────────────────────────────────────────────────────
+var actx, masterGain, audioStarted=false, soundOn=true;
+function startAudio() {
+  if (audioStarted || !soundOn) return;
+  audioStarted = true;
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = actx.createGain(); masterGain.gain.value = 0.04;
+    masterGain.connect(actx.destination);
+    var buf = actx.createBuffer(1, actx.sampleRate*3, actx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i=0; i<d.length; i++) d[i] = Math.random()*2-1;
+    var ns = actx.createBufferSource(); ns.buffer=buf; ns.loop=true;
+    var lp = actx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=180;
+    ns.connect(lp); lp.connect(masterGain); ns.start();
+    var hm=actx.createOscillator(), hg=actx.createGain();
+    hm.frequency.value=60; hg.gain.value=0.005;
+    hm.connect(hg); hg.connect(masterGain); hm.start();
+    var sc=[196,220,261,329,392]; var si=0;
+    (function nt(){
+      if(!soundOn||!actx) return;
+      if(Math.random()>0.4){
+        var o=actx.createOscillator(), g=actx.createGain();
+        o.type='triangle'; o.frequency.value=sc[si++%sc.length];
+        g.gain.setValueAtTime(0,actx.currentTime);
+        g.gain.linearRampToValueAtTime(0.01,actx.currentTime+0.1);
+        g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+1.5);
+        o.connect(g); g.connect(masterGain); o.start(); o.stop(actx.currentTime+1.7);
+      }
+      setTimeout(nt, 1000+Math.random()*2200);
+    })();
+  } catch(e){ console.warn('audio',e); }
+}
+document.getElementById('soundBtn').addEventListener('click', function(){
+  soundOn = !soundOn;
+  document.getElementById('soundBtn').textContent = soundOn ? '♪ Sound' : '♪ Muted';
+  if (masterGain) masterGain.gain.value = soundOn ? 0.04 : 0;
+  if (soundOn && !audioStarted) startAudio();
+});
+
+// ─── PROCEDURAL TEXTURES ─────────────────────────────────────────────────────
+function makeBrickTex() {
+  var cv=document.createElement('canvas'); cv.width=512; cv.height=256;
+  var cx=cv.getContext('2d');
+  cx.fillStyle='#221208'; cx.fillRect(0,0,512,256);
+  var BW=60, BH=28, M=3;
+  for (var row=0; row<12; row++) {
+    var off=(row%2)*30;
+    for (var col=-1; col<10; col++) {
+      var rv=80+Math.floor(Math.random()*40), gv=24+Math.floor(Math.random()*16);
+      cx.fillStyle='rgb('+rv+','+gv+',14)';
+      cx.fillRect(col*BW+off+M, row*BH+M, BW-M*2, BH-M*2);
+    }
+  }
+  var t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(3,2.5); return t;
+}
+function makeFloorTex() {
+  var cv=document.createElement('canvas'); cv.width=512; cv.height=512;
+  var cx=cv.getContext('2d');
+  cx.fillStyle='#1a1610'; cx.fillRect(0,0,512,512);
+  for (var i=0; i<7000; i++) {
+    var v=Math.random()*30-15;
+    cx.fillStyle='rgba('+(88+v)+','+(78+v)+','+(60+v)+',0.11)';
+    cx.fillRect(Math.random()*512,Math.random()*512,Math.random()*3,Math.random()*3);
+  }
+  cx.strokeStyle='rgba(6,4,2,0.5)'; cx.lineWidth=1;
+  for (var g=0; g<512; g+=62) {
+    cx.beginPath(); cx.moveTo(g,0); cx.lineTo(g,512); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,g); cx.lineTo(512,g); cx.stroke();
+  }
+  var t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(4,4); return t;
+}
+function makeWoodTex() {
+  var cv=document.createElement('canvas'); cv.width=256; cv.height=256;
+  var cx=cv.getContext('2d');
+  cx.fillStyle='#6a4018'; cx.fillRect(0,0,256,256);
+  for (var i=0; i<55; i++) {
+    var v=Math.random()*16-8;
+    cx.strokeStyle='rgba('+(48+v)+','+(26+v)+','+(8+v)+',0.32)';
+    cx.lineWidth=0.9+Math.random()*1.2;
+    cx.beginPath(); cx.moveTo(0,i*4.7+Math.random()*3);
+    cx.lineTo(256,i*4.7+Math.random()*3); cx.stroke();
+  }
+  var t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,2); return t;
+}
+
+var brickTex = makeBrickTex();
+var floorTex = makeFloorTex();
+var woodTex  = makeWoodTex();
+
+var matBrick = new THREE.MeshStandardMaterial({map:brickTex, roughness:.92, metalness:.02});
+var matFloor = new THREE.MeshStandardMaterial({map:floorTex, roughness:.87, metalness:.04});
+var matCeil  = new THREE.MeshStandardMaterial({color:0x141210, roughness:.95});
+var matMetal = new THREE.MeshStandardMaterial({color:0x484030, roughness:.45, metalness:.78});
+var matBeam  = new THREE.MeshStandardMaterial({color:0x252018, roughness:.65, metalness:.55});
+var matWood  = new THREE.MeshStandardMaterial({map:woodTex,  roughness:.82, metalness:.04, color:0xb87830});
+
+// ─── ROOM GEOMETRY ──────────────────────────────────────────────────────────
+// Compact: 10 wide × 12 deep × 3.4 tall.  Door at z=+6 (front face).
+var RW=10, RD=12, RH=3.4;
+var DW=2.0, DH=2.5;   // door width, door height
+
+function addBox(w,h,d, x,y,z, mat, cast, recv) {
+  var m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z);
+  if(cast!==false) m.castShadow=true;
+  if(recv!==false) m.receiveShadow=true;
+  scene.add(m); return m;
+}
+
+// Floor & ceiling
+var floorMesh=new THREE.Mesh(new THREE.PlaneGeometry(RW,RD),matFloor);
+floorMesh.rotation.x=-Math.PI/2; floorMesh.receiveShadow=true; scene.add(floorMesh);
+var ceilMesh=new THREE.Mesh(new THREE.PlaneGeometry(RW,RD),matCeil);
+ceilMesh.rotation.x=Math.PI/2; ceilMesh.position.y=RH; scene.add(ceilMesh);
+
+// Walls
+addBox(RW, RH, 0.2,  0, RH/2, -RD/2,  matBrick); // back
+addBox(0.2,RH, RD, -RW/2, RH/2, 0,    matBrick); // left
+addBox(0.2,RH, RD,  RW/2, RH/2, 0,    matBrick); // right
+
+// Front wall with door gap
+var sw=(RW-DW)/2;
+addBox(sw, RH, 0.2, -(RW/2)+sw/2, RH/2, RD/2, matBrick, false);
+addBox(sw, RH, 0.2,  (RW/2)-sw/2, RH/2, RD/2, matBrick, false);
+addBox(DW, RH-DH, 0.2, 0, DH+(RH-DH)/2, RD/2, matBrick, false);
+
+// Steel door frame
+addBox(0.1, DH, 0.18, -DW/2, DH/2, RD/2, matMetal, false);
+addBox(0.1, DH, 0.18,  DW/2, DH/2, RD/2, matMetal, false);
+addBox(DW+0.12, 0.1, 0.18, 0, DH, RD/2,  matMetal, false);
+
+// Base trim
+addBox(RW, 0.09, 0.08,  0,    0.045, -RD/2,  matMetal, false);
+addBox(0.08,0.09, RD, -RW/2, 0.045, 0,       matMetal, false);
+addBox(0.08,0.09, RD,  RW/2, 0.045, 0,       matMetal, false);
+
+// I-beams
+for (var bz=-4; bz<=4; bz+=3) {
+  addBox(RW, 0.18, 0.09, 0, RH-0.09, bz, matBeam);
+  addBox(RW, 0.05, 0.2,  0, RH-0.21, bz, matBeam, false);
+  addBox(RW, 0.05, 0.2,  0, RH,      bz, matBeam, false);
+}
+
+// ── Honeycomb LED fixture (ceiling, matching reference image) ────────────────
+var ledMat = new THREE.MeshStandardMaterial({
+  color:0xffffff, emissive:0xddf0ff, emissiveIntensity:2.8, roughness:.2
+});
+// 7-hex cluster centred at (0, RH-0.01, -1.5)
+var hexCtrs = [[0,0],[1.05,0],[-1.05,0],[0.525,0.91],[-0.525,0.91],[0.525,-0.91],[-0.525,-0.91]];
+hexCtrs.forEach(function(hc) {
+  var hx=hc[0]*0.85, hz=hc[1]*0.85-1.5;
+  for (var s=0; s<6; s++) {
+    var a0=(s/6)*Math.PI*2, a1=((s+1)/6)*Math.PI*2, r=0.48;
+    var mx=(Math.cos(a0)+Math.cos(a1))/2*r+hx;
+    var mz=(Math.sin(a0)+Math.sin(a1))/2*r+hz;
+    var segLen = r * Math.sqrt(2*(1-Math.cos(Math.PI/3)));
+    var ang = Math.atan2(Math.sin(a1)-Math.sin(a0), Math.cos(a1)-Math.cos(a0));
+    var bar = new THREE.Mesh(new THREE.BoxGeometry(segLen+0.02, 0.025, 0.04), ledMat);
+    bar.position.set(mx, RH-0.012, mz); bar.rotation.y=-ang; scene.add(bar);
+  }
+});
+// LED emits actual light
+var hexLight = new THREE.PointLight(0xe8f2ff, 1.0, 10, 1.4);
+hexLight.position.set(0, RH-0.05, -1.5); scene.add(hexLight);
+
+// Pipe conduit runs on ceiling
+var condMat=new THREE.MeshStandardMaterial({color:0x222018,roughness:.5,metalness:.7});
+addBox(RW, 0.04, 0.04, 0, RH-0.02, -4.5, condMat, false);
+addBox(RW, 0.04, 0.04, 0, RH-0.02,  2.0, condMat, false);
+
+// Area rug
+var rugBorder=new THREE.Mesh(new THREE.PlaneGeometry(2.4,8.5),
+  new THREE.MeshStandardMaterial({color:0xc4622d,roughness:.99}));
+rugBorder.rotation.x=-Math.PI/2; rugBorder.position.set(0,.002,0); scene.add(rugBorder);
+var rugFill=new THREE.Mesh(new THREE.PlaneGeometry(2.0,8.1),
+  new THREE.MeshStandardMaterial({color:0x2a1c12,roughness:.99}));
+rugFill.rotation.x=-Math.PI/2; rugFill.position.set(0,.004,0); scene.add(rugFill);
+
+// Shelves on back wall
+var shelfMat=new THREE.MeshStandardMaterial({map:woodTex,roughness:.82,color:0xa06828});
+[0.92, 1.52, 2.1].forEach(function(sy) {
+  addBox(2.4, 0.05, 0.2, 0, sy, -RD/2+0.16, shelfMat, false);
+});
+addBox(0.05, 2.0, 0.2, -1.18, 1.2, -RD/2+0.16, matMetal, false);
+addBox(0.05, 2.0, 0.2,  1.18, 1.2, -RD/2+0.16, matMetal, false);
+var jarCols=[0x4a7aa0,0xa04a2a,0x4a9a6a,0xb08030,0x7a5090,0x3a7060];
+for (var ji=0; ji<12; ji++) {
+  var jw=0.08+Math.random()*0.08, jh=0.09+Math.random()*0.12;
+  addBox(jw,jh,0.1, -1.0+ji*0.19, 0.96+Math.floor(ji/4)*0.6, -RD/2+0.22,
+    new THREE.MeshStandardMaterial({color:jarCols[ji%6],roughness:.65}), false);
+}
+
+// Arched window (right wall, from reference image)
+var glassMat=new THREE.MeshStandardMaterial({
+  color:0x90bcd8, emissive:0x507090, emissiveIntensity:1.3,
+  transparent:true, opacity:0.88, roughness:0.06
+});
+var glass=new THREE.Mesh(new THREE.PlaneGeometry(1.4,1.8), glassMat);
+glass.rotation.y=-Math.PI/2; glass.position.set(RW/2-0.1, 2.1, 2.5); scene.add(glass);
+// Frame
+var frameMat=new THREE.MeshStandardMaterial({color:0x1c1812, roughness:.5, metalness:.65});
+addBox(0.08, 0.06, 1.45, RW/2-0.08, 1.2,  2.5, frameMat, false); // sill
+addBox(0.08, 0.06, 1.45, RW/2-0.08, 3.0,  2.5, frameMat, false); // top
+addBox(0.08, 1.8, 0.06, RW/2-0.08, 2.1, 1.78, frameMat, false);  // left side
+addBox(0.08, 1.8, 0.06, RW/2-0.08, 2.1, 3.22, frameMat, false);  // right side
+addBox(0.08, 0.06, 1.45, RW/2-0.08, 2.1, 2.5, frameMat, false);  // horiz bar
+addBox(0.08, 1.8, 0.06, RW/2-0.08, 2.1, 2.5, frameMat, false);   // vert bar
+
+// EkkoStudio logo on back wall (reference image style)
+function makeLogoTex() {
+  var cv=document.createElement('canvas'); cv.width=640; cv.height=200;
+  var cx=cv.getContext('2d');
+  cx.clearRect(0,0,640,200);
+  // Circle with E mark
+  cx.strokeStyle='#c8b898'; cx.lineWidth=5;
+  cx.beginPath(); cx.arc(92,100,72,0,Math.PI*2); cx.stroke();
+  cx.fillStyle='#c8b898';
+  cx.fillRect(58,74,68,11); cx.fillRect(58,95,52,11); cx.fillRect(58,116,68,11);
+  cx.fillStyle='#f2ead8'; cx.font='bold 68px Arial';
+  cx.textBaseline='middle'; cx.textAlign='left';
+  cx.fillText('EkkoStudio', 178, 100);
+  return new THREE.CanvasTexture(cv);
+}
+var logoM=new THREE.Mesh(new THREE.PlaneGeometry(2.8,0.88),
+  new THREE.MeshStandardMaterial({map:makeLogoTex(),transparent:true,
+    emissive:0x180e04,emissiveIntensity:.25,side:THREE.FrontSide}));
+logoM.position.set(-0.5, 2.6, -RD/2+0.15); scene.add(logoM);
+
+// Exterior sign + stoop
+function makeExtTex() {
+  var cv=document.createElement('canvas'); cv.width=512; cv.height=96;
+  var cx=cv.getContext('2d');
+  cx.fillStyle='#0e0a06'; cx.fillRect(0,0,512,96);
+  cx.fillStyle='#c4622d'; cx.fillRect(0,88,512,8);
+  cx.fillStyle='#f2ead8'; cx.font='bold 50px Arial';
+  cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('EKKOSTUDIO',256,44);
+  return new THREE.CanvasTexture(cv);
+}
+var extSign=new THREE.Mesh(new THREE.PlaneGeometry(2.4,0.5),
+  new THREE.MeshStandardMaterial({map:makeExtTex(),emissive:0x180a02,emissiveIntensity:.7}));
+extSign.position.set(0, RH-0.32, RD/2+0.12); scene.add(extSign);
+addBox(3.0, 0.13, 1.2, 0, -0.065, RD/2+0.6,
+  new THREE.MeshStandardMaterial({color:0x1a1612,roughness:.95}), false);
+
+// Fire extinguisher
+addBox(0.11,0.38,0.11, -RW/2+0.16, 0.24, RD/2-0.5,
+  new THREE.MeshStandardMaterial({color:0xaa2020,roughness:.5,metalness:.2}), false);
+
+// ─── LIGHTING ────────────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x2a1e12, 0.55));
+
+// Door daylight
+var dLight=new THREE.SpotLight(0x90b8d8, 1.8, 10, 0.55, 0.6);
+dLight.position.set(0, RH-0.3, RD/2+3);
+dLight.target.position.set(0, 0.5, RD/2);
+dLight.castShadow=false;
+scene.add(dLight); scene.add(dLight.target);
+
+// Window light (from right)
+var winLight=new THREE.SpotLight(0xb0d0e8, 1.2, 8, 0.5, 0.8);
+winLight.position.set(RW/2-0.5, 2.4, 2.5);
+winLight.target.position.set(-2, 0.5, 2.5);
+winLight.castShadow=false;
+scene.add(winLight); scene.add(winLight.target);
+
+// Edison pendant lights — 8 positions spread across the room
+var ediPos=[
+  [-2.5, RH, -4.5], [2.5, RH, -4.5],
+  [-2.5, RH, -1.2], [2.5, RH, -1.2],
+  [-2.5, RH,  1.8], [2.5, RH,  1.8],
+  [ 0.0, RH, -2.8], [0.0, RH,  0.5],
+];
+var bulbMat=new THREE.MeshStandardMaterial({color:0xffcc55,emissive:0xffaa33,emissiveIntensity:4});
+var cordMat=new THREE.MeshStandardMaterial({color:0x1c1a14,roughness:.9});
+var sockMat=new THREE.MeshStandardMaterial({color:0x4a3820,metalness:.7,roughness:.4});
+ediPos.forEach(function(ep) {
+  var ex=ep[0], ey=ep[1], ez=ep[2];
+  var cl=0.35+Math.random()*0.55;
+  var cord=new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,cl,4),cordMat);
+  cord.position.set(ex, ey-cl/2, ez); scene.add(cord);
+  var sock=new THREE.Mesh(new THREE.CylinderGeometry(0.038,0.034,0.09,8),sockMat);
+  sock.position.set(ex, ey-cl-0.045, ez); scene.add(sock);
+  var bulb=new THREE.Mesh(new THREE.SphereGeometry(0.05,10,8),bulbMat);
+  bulb.position.set(ex, ey-cl-0.13, ez); scene.add(bulb);
+  var pl=new THREE.PointLight(0xffb84d, 1.2, 5.5, 1.8);
+  pl.position.set(ex, ey-cl-0.16, ez);
+  pl.castShadow=true;
+  pl.shadow.mapSize.width=pl.shadow.mapSize.height=256;
+  pl.shadow.bias=-0.003;
+  scene.add(pl);
+});
+
+// ─── STATION BUILDER ─────────────────────────────────────────────────────────
+var hitMeshes  = [];
+var flameMeshes= [];
+var viewPts    = [];
+
+function makeSignTex(icon, name, hex) {
+  var cv=document.createElement('canvas'); cv.width=512; cv.height=112;
+  var cx=cv.getContext('2d');
+  cx.fillStyle='#0c0906'; cx.fillRect(0,0,512,112);
+  cx.fillStyle=hex; cx.fillRect(0,0,512,5); cx.fillRect(0,107,512,5);
+  cx.font='50px serif'; cx.textBaseline='middle';
+  cx.fillText(icon, 16, 58);
+  cx.fillStyle='#f2ead8'; cx.font='bold 34px Arial';
+  cx.fillText(name, 82, 46);
+  cx.fillStyle=hex; cx.font='10px Arial';
+  cx.fillText('EKKOSTUDIO · REDMOND WA', 82, 80);
+  return new THREE.CanvasTexture(cv);
+}
+
+function buildStation(st) {
+  var id=st.id, col=st.col, hex=st.hex;
+  var sx=st.pos.x, sz=st.pos.z;
+  var isLeft = sx < 0;
+  var G = new THREE.Group();
+
+  // Coloured accent strip (ceiling-mounted)
+  var acMat=new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.75,roughness:.6});
+  var strip=new THREE.Mesh(new THREE.BoxGeometry(2.3,0.055,0.07),acMat);
+  strip.position.set(0, RH-0.015, isLeft?-0.5:0.5); G.add(strip);
+
+  // ── Workbench (light wood top, dark steel legs — matches reference image)
+  var topMat=new THREE.MeshStandardMaterial({map:woodTex,roughness:.75,metalness:.04,color:0xc8843c});
+  var tabTop=new THREE.Mesh(new THREE.BoxGeometry(2.3,0.08,1.2),topMat);
+  tabTop.position.set(0,0.9,0); tabTop.castShadow=true; tabTop.receiveShadow=true; G.add(tabTop);
+
+  var legM=new THREE.MeshStandardMaterial({color:0x222018,metalness:.7,roughness:.4});
+  [[-1.0,-.52],[-1.0,.52],[1.0,-.52],[1.0,.52]].forEach(function(l) {
+    var leg=new THREE.Mesh(new THREE.CylinderGeometry(0.038,0.038,0.9,8),legM);
+    leg.position.set(l[0],0.45,l[1]); leg.castShadow=true; G.add(leg);
+    var fp=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.03,0.1),legM);
+    fp.position.set(l[0],0.015,l[1]); G.add(fp);
+  });
+  [-.52,.52].forEach(function(lz) {
+    var s=new THREE.Mesh(new THREE.BoxGeometry(2.0,0.035,0.035),legM);
+    s.position.set(0,0.35,lz); G.add(s);
+  });
+
+  // Pegboard panel behind table
+  var panMat=new THREE.MeshStandardMaterial({color:0x1a1208,roughness:.88});
+  var panel=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.38,0.055),panMat);
+  panel.position.set(0, 1.73, isLeft?-0.5:0.5); panel.castShadow=true; G.add(panel);
+
+  // Station sign
+  var sgnMat=new THREE.MeshStandardMaterial({map:makeSignTex(st.icon,st.name,hex),
+    emissive:0x060402,emissiveIntensity:.35});
+  var sgn=new THREE.Mesh(new THREE.PlaneGeometry(2.1,0.46),sgnMat);
+  sgn.position.set(0, 2.26, isLeft?-0.48:0.48);
+  if (!isLeft) sgn.rotation.y=Math.PI;
+  G.add(sgn);
+
+  // Station accent spot
+  var spot=new THREE.SpotLight(col, 1.0, 4.5, 0.68, 0.5, 1.3);
+  spot.position.set(0,3.1,0); spot.target.position.set(0,0.9,0);
+  spot.castShadow=false; G.add(spot); G.add(spot.target);
+
+  // Props
+  addProps(G, id, col);
+
+  // Invisible hit-box
+  var hit=new THREE.Mesh(
+    new THREE.BoxGeometry(2.5,2.1,1.6),
+    new THREE.MeshBasicMaterial({visible:false})
+  );
+  hit.position.set(0,1.05,0);
+  hit.userData={sid:id};
+  G.add(hit); hitMeshes.push(hit);
+
+  G.position.set(sx,0,sz);
+  scene.add(G);
+
+  // Tour viewpoint: in the centre aisle facing the table
+  var vpx = isLeft ? sx+1.8 : sx-1.8;
+  viewPts.push({x:vpx, y:1.72, z:sz, yaw:isLeft?0:Math.PI});
+}
+
+// ─── PROPS ───────────────────────────────────────────────────────────────────
+function addProps(G, id, col) {
+  var Y=0.97;
+
+  if (id===0) { // 3D PRINTING
+    var pm=new THREE.MeshStandardMaterial({color:0x1e2838,roughness:.45,metalness:.4});
+    var body=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.42,0.42),pm);
+    body.position.set(0.45,Y+0.21,0); body.castShadow=true; G.add(body);
+    var bed=new THREE.Mesh(new THREE.BoxGeometry(0.36,0.02,0.34),
+      new THREE.MeshStandardMaterial({color:0x2c3a52,metalness:.5}));
+    bed.position.set(0.45,Y+0.25,0); G.add(bed);
+    var obj=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.14,8),
+      new THREE.MeshStandardMaterial({color:col,roughness:.5}));
+    obj.position.set(0.45,Y+0.33,0.07); G.add(obj);
+    // 3 filament spools
+    [-0.28,0,0.28].forEach(function(oz) {
+      var sp=new THREE.Mesh(new THREE.TorusGeometry(0.095,0.034,8,18),
+        new THREE.MeshStandardMaterial({color:[0x111111,0x2a6ac4,0xe82020][Math.round(oz/0.28+1)]}));
+      sp.rotation.y=Math.PI/2; sp.position.set(-0.46,Y+0.2,oz); sp.castShadow=true; G.add(sp);
+    });
+    var lp=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.016,0.2),
+      new THREE.MeshStandardMaterial({color:0x282828,metalness:.65}));
+    lp.position.set(-0.5,Y+0.008,0.2); G.add(lp);
+  }
+
+  if (id===1) { // CLAY JEWELRY
+    var cm=new THREE.MeshStandardMaterial({color:0xc4875a,roughness:.9});
+    var bl=new THREE.Mesh(new THREE.BoxGeometry(0.19,0.12,0.14),cm);
+    bl.position.set(-0.38,Y+0.06,0.1); G.add(bl);
+    var rp=new THREE.Mesh(new THREE.CylinderGeometry(0.032,0.032,0.42,10),
+      new THREE.MeshStandardMaterial({color:0x7a5030,roughness:.8}));
+    rp.rotation.z=Math.PI/2; rp.position.set(0,Y+0.032,0.26); G.add(rp);
+    var stm=new THREE.MeshStandardMaterial({color:0xd4a060,metalness:.5});
+    var stnd=new THREE.Mesh(new THREE.BoxGeometry(0.038,0.22,0.038),stm);
+    stnd.position.set(0.4,Y+0.11,0.02); G.add(stnd);
+    var stndT=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.028,0.028),stm);
+    stndT.position.set(0.4,Y+0.22,0.02); G.add(stndT);
+    [-0.07,0.07].forEach(function(ox) {
+      var e=new THREE.Mesh(new THREE.SphereGeometry(0.028,8,8),
+        new THREE.MeshStandardMaterial({color:col,metalness:.3}));
+      e.position.set(0.4+ox,Y+0.26,0.02); G.add(e);
+    });
+    var pend=new THREE.Mesh(new THREE.TorusGeometry(0.05,0.013,8,14),
+      new THREE.MeshStandardMaterial({color:0xe8c870,metalness:.7}));
+    pend.position.set(0.4,Y+0.18,0.13); G.add(pend);
+    var tool=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.013,0.02),
+      new THREE.MeshStandardMaterial({color:0xbaa888,metalness:.5}));
+    tool.position.set(-0.08,Y+0.007,-0.26); tool.rotation.y=0.3; G.add(tool);
+  }
+
+  if (id===2) { // CRICUT
+    var mat=new THREE.Mesh(new THREE.BoxGeometry(0.54,0.01,0.4),
+      new THREE.MeshStandardMaterial({color:0x1a5e48,roughness:.7}));
+    mat.position.set(0.15,Y+0.005,0); G.add(mat);
+    for (var gi=-3; gi<=3; gi++) {
+      var gl=new THREE.Mesh(new THREE.BoxGeometry(0.54,0.003,0.003),
+        new THREE.MeshStandardMaterial({color:0x288060}));
+      gl.position.set(0.15,Y+0.012,gi*0.052); G.add(gl);
+    }
+    var vr1=new THREE.Mesh(new THREE.CylinderGeometry(0.052,0.052,0.36,12),
+      new THREE.MeshStandardMaterial({color:col}));
+    vr1.rotation.z=Math.PI/2; vr1.position.set(-0.42,Y+0.065,-0.07); G.add(vr1);
+    var vr2=new THREE.Mesh(new THREE.CylinderGeometry(0.048,0.048,0.32,12),
+      new THREE.MeshStandardMaterial({color:0xd04040}));
+    vr2.rotation.z=Math.PI/2; vr2.position.set(-0.42,Y+0.065,0.19); G.add(vr2);
+    var mach=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.12,0.19),
+      new THREE.MeshStandardMaterial({color:0xe8e2d8,roughness:.4,metalness:.1}));
+    mach.position.set(0.36,Y+0.06,0.04); G.add(mach);
+    var cut=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.004,0.15),
+      new THREE.MeshStandardMaterial({color:0xf0e8d0}));
+    cut.position.set(0.15,Y+0.016,0.04); G.add(cut);
+  }
+
+  if (id===3) { // CANDLE MAKING
+    var potM=new THREE.MeshStandardMaterial({color:0x7a6040,metalness:.6,roughness:.4});
+    var pot=new THREE.Mesh(new THREE.CylinderGeometry(0.088,0.078,0.21,12),potM);
+    pot.position.set(-0.36,Y+0.105,0); pot.castShadow=true; G.add(pot);
+    var hndl=new THREE.Mesh(new THREE.TorusGeometry(0.072,0.012,6,10,Math.PI),potM);
+    hndl.rotation.z=-Math.PI/2; hndl.position.set(-0.29,Y+0.2,0); G.add(hndl);
+    var waxC=[0xfff6e0,0xf0e2c0,0xe4d0a8];
+    [[0.2,0.15,0.16,0.055,0.28],[0.42,0.11,-0.08,0.048,0.2],[0.42,0.085,0.15,0.044,0.15]].forEach(function(p,i) {
+      var candle=new THREE.Mesh(new THREE.CylinderGeometry(p[3],p[3],p[4],12),
+        new THREE.MeshStandardMaterial({color:waxC[i],roughness:.8}));
+      candle.position.set(p[0],p[1],p[2]); candle.castShadow=true; G.add(candle);
+      var wick=new THREE.Mesh(new THREE.CylinderGeometry(0.0025,0.0025,0.046,4),
+        new THREE.MeshStandardMaterial({color:0x221408}));
+      wick.position.set(p[0],p[1]+p[4]/2+0.023,p[2]); G.add(wick);
+      var flame=new THREE.Mesh(new THREE.SphereGeometry(0.015,6,6),
+        new THREE.MeshStandardMaterial({color:0xffcc44,emissive:0xff8800,emissiveIntensity:3.5}));
+      flame.position.set(p[0],p[1]+p[4]/2+0.05,p[2]); G.add(flame);
+      flameMeshes.push(flame);
+    });
+    var mold=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.074,0.18,12),
+      new THREE.MeshStandardMaterial({color:0x909090,metalness:.5}));
+    mold.position.set(-0.14,Y+0.09,-0.26); G.add(mold);
+    [[-0.5,0.17],[-0.59,-0.09]].forEach(function(b) {
+      var btl=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.1,8),
+        new THREE.MeshStandardMaterial({color:0x88a0b8,transparent:true,opacity:.72}));
+      btl.position.set(b[0],Y+0.05,b[1]); G.add(btl);
+    });
+  }
+}
+
+STATIONS.forEach(buildStation);
+
+// ─── COLLISION ───────────────────────────────────────────────────────────────
+// Tight room: player can roam RW=10, RD=12 interior
+var BOUNDS={minX:-RW/2+0.4, maxX:RW/2-0.4, minZ:-RD/2+0.3, maxZ:RD/2+2.0};
+// Table obstacles in world space — slightly padded inward
+var TABLES=STATIONS.map(function(s) {
+  return {minX:s.pos.x-1.35, maxX:s.pos.x+1.35, minZ:s.pos.z-0.75, maxZ:s.pos.z+0.75};
+});
+function isBlocked(nx,nz) {
+  for (var i=0; i<TABLES.length; i++) {
+    var t=TABLES[i];
+    if (nx>t.minX-0.28 && nx<t.maxX+0.28 && nz>t.minZ-0.28 && nz<t.maxZ+0.28) return true;
+  }
+  return false;
+}
+
+// ─── GUIDED TOUR ─────────────────────────────────────────────────────────────
+var tourActive=false, tourLerping=false, tourTimer=null;
+var tourIdx=0;
+var tgtX=0, tgtZ=0, tgtYaw=0;
+var TOUR_STOPS=STATIONS.map(function(st,i) {
+  return {x:viewPts[i].x, z:viewPts[i].z, yaw:viewPts[i].yaw, label:st.name};
+}).concat([{x:START_X, z:START_Z, yaw:START_YAW, label:''}]);
+
+var tourBtn=document.getElementById('tourBtn');
+tourBtn.addEventListener('click', function() { tourActive ? stopTour() : startTour(); });
+
+function startTour() {
+  tourActive=true; tourIdx=0;
+  tourBtn.textContent='✕ Stop Tour'; tourBtn.classList.add('on');
+  if (document.exitPointerLock) document.exitPointerLock();
+  gotoStop(0);
+}
+function stopTour() {
+  tourActive=false; tourLerping=false; clearTimeout(tourTimer);
+  tourBtn.textContent='✦ Guided Tour'; tourBtn.classList.remove('on');
+  document.getElementById('tlabel').style.display='none';
+}
+function gotoStop(i) {
+  if (!tourActive||i>=TOUR_STOPS.length) { stopTour(); return; }
+  var s=TOUR_STOPS[i];
+  tgtX=s.x; tgtZ=s.z; tgtYaw=s.yaw; tourLerping=true;
+  var tl=document.getElementById('tlabel');
+  tl.style.display=s.label?'block':'none'; tl.textContent=s.label||'';
+  tourTimer=setTimeout(function(){
+    tourLerping=false;
+    if (i<STATIONS.length) tourTimer=setTimeout(function(){gotoStop(i+1);},3000);
+    else stopTour();
+  }, 1600);
+}
+
+// ─── MODAL ───────────────────────────────────────────────────────────────────
+var modal=document.getElementById('modal');
+document.getElementById('mcls').addEventListener('click',function(){modal.classList.remove('open');});
+modal.addEventListener('click',function(e){if(e.target===modal)modal.classList.remove('open');});
+document.addEventListener('keydown',function(e){if(e.code==='Escape')modal.classList.remove('open');});
+
+function openCatalog(sid) {
+  var st=STATIONS[sid];
+  document.getElementById('mst').textContent=st.icon+' '+st.name.toUpperCase()+' STATION';
+  document.getElementById('mti').textContent=st.name;
+  document.getElementById('mde').textContent=st.desc;
+  document.getElementById('mpr').innerHTML=st.products.map(function(p){
+    return '<div class="mpr"><div><div class="pname">'+p.name+'</div>'+
+      '<div class="pdesc">'+p.desc+'</div></div>'+
+      '<div class="pright"><div class="pprice">'+p.price+'</div>'+
+      '<button class="pbtn">Shop Soon ↗</button></div></div>';
+  }).join('');
+  modal.classList.add('open');
+}
+
+// ─── RAYCASTING ──────────────────────────────────────────────────────────────
+var ray=new THREE.Raycaster();
+var C2=new THREE.Vector2(0,0);
+var promptEl=document.getElementById('prompt');
+var hovSid=-1;
+
+canvas.addEventListener('click', function() {
+  // Only open catalog if locked; introGone not required for this
+  if (!locked) return;
+  if (hovSid>=0) openCatalog(hovSid);
+});
+document.addEventListener('keydown', function(e) {
+  if (e.code==='KeyE'&&hovSid>=0&&!modal.classList.contains('open')) openCatalog(hovSid);
+});
+
+// ─── MOVEMENT ────────────────────────────────────────────────────────────────
+var mv=new THREE.Vector3(), yQ=new THREE.Quaternion();
+var clk=new THREE.Clock();
+
+function updateMove(dt) {
+  if (tourActive && tourLerping) {
+    var f=Math.min(1,dt*3.0);
+    px += (tgtX-px)*f; pz += (tgtZ-pz)*f;
+    var dy=tgtYaw-pyaw;
+    while(dy> Math.PI) dy-=Math.PI*2;
+    while(dy<-Math.PI) dy+=Math.PI*2;
+    pyaw   += dy*f*1.8;
+    ppitch += (0-ppitch)*f;
+    cam.position.set(px,py,pz);
+    cam.rotation.set(ppitch,pyaw,0);
+    return;
+  }
+  if (tourActive) return;
+
+  var spd=(keys['ShiftLeft']||keys['ShiftRight'])?5.5:2.8;
+  mv.set(0,0,0);
+  if(keys['KeyW']||keys['ArrowUp'])    mv.z-=1;
+  if(keys['KeyS']||keys['ArrowDown'])  mv.z+=1;
+  if(keys['KeyA']||keys['ArrowLeft'])  mv.x-=1;
+  if(keys['KeyD']||keys['ArrowRight']) mv.x+=1;
+  if(mv.lengthSq()>0) mv.normalize();
+
+  yQ.setFromAxisAngle(new THREE.Vector3(0,1,0), pyaw);
+  mv.applyQuaternion(yQ);
+
+  var nx=px+mv.x*spd*dt, nz=pz+mv.z*spd*dt;
+  nx=Math.max(BOUNDS.minX, Math.min(BOUNDS.maxX, nx));
+  nz=Math.max(BOUNDS.minZ, Math.min(BOUNDS.maxZ, nz));
+  if (!isBlocked(nx,nz)) { px=nx; pz=nz; }
+  cam.position.set(px,py,pz);
+  cam.rotation.set(ppitch,pyaw,0);
+}
+
+// ─── MINIMAP ─────────────────────────────────────────────────────────────────
+var mmC2=document.getElementById('mmC');
+var mmX=mmC2.getContext('2d');
+var MM=126, MR=16, MO=-8;   // covers -8..+8 in both axes (tight room)
+function w2m(wx,wz){return{mx:(wx-MO)/MR*MM, my:(wz-MO)/MR*MM};}
+
+function drawMap() {
+  mmX.clearRect(0,0,MM,MM);
+  mmX.fillStyle='#0a0806'; mmX.fillRect(0,0,MM,MM);
+  var r1=w2m(-RW/2,-RD/2), r2=w2m(RW/2,RD/2);
+  mmX.fillStyle='#181008'; mmX.fillRect(r1.mx,r1.my,r2.mx-r1.mx,r2.my-r1.my);
+  mmX.strokeStyle='#3a2010'; mmX.lineWidth=1;
+  mmX.strokeRect(r1.mx,r1.my,r2.mx-r1.mx,r2.my-r1.my);
+  STATIONS.forEach(function(st) {
+    var p=w2m(st.pos.x-1.25,st.pos.z-0.72);
+    var bw=(2.5/MR)*MM, bh=(1.44/MR)*MM;
+    mmX.fillStyle='#'+st.col.toString(16).padStart(6,'0')+'a0';
+    mmX.fillRect(p.mx,p.my,bw,bh);
+    var lp=w2m(st.pos.x,st.pos.z);
+    mmX.fillStyle='#f2ead8'; mmX.font='5px sans-serif'; mmX.textAlign='center';
+    mmX.fillText(st.name.split(' ')[0],lp.mx,lp.my+2);
+  });
+  var pp=w2m(px,pz);
+  mmX.fillStyle='#c4622d';
+  mmX.beginPath(); mmX.arc(pp.mx,pp.my,3.5,0,Math.PI*2); mmX.fill();
+  mmX.strokeStyle='#e8a030'; mmX.lineWidth=1.5;
+  mmX.beginPath(); mmX.moveTo(pp.mx,pp.my);
+  var da=(4.5/MR)*MM;
+  mmX.lineTo(pp.mx+Math.sin(pyaw)*da*0.6, pp.my+Math.cos(pyaw)*da*0.6);
+  mmX.stroke();
+}
+
+// ─── MAIN LOOP ───────────────────────────────────────────────────────────────
+var t=0;
+function animate() {
+  requestAnimationFrame(animate);
+  var dt=Math.min(clk.getDelta(),0.05);
+  t+=dt;
+
+  updateMove(dt);
+
+  // Raycasting (hover detection)
+  ray.setFromCamera(C2,cam);
+  var hits=ray.intersectObjects(hitMeshes);
+  if (hits.length>0) {
+    var sid=hits[0].object.userData.sid;
+    if (hovSid!==sid) {
+      hovSid=sid;
+      var st2=STATIONS[sid];
+      promptEl.style.display='block';
+      promptEl.textContent=st2.icon+' '+st2.name+' — Press E or click to view catalog';
+      canvas.style.cursor='pointer';
+    }
+  } else {
+    if (hovSid>=0) {
+      hovSid=-1;
+      promptEl.style.display='none';
+      canvas.style.cursor='crosshair';
+    }
+  }
+
+  // Candle flame flicker
+  flameMeshes.forEach(function(f,i) {
+    f.material.emissiveIntensity = 3.0+Math.sin(t*10+i*2.2)*0.9;
+  });
+
+  drawMap();
+  renderer.render(scene,cam);
+}
+animate();
+</script>
 </body>
 </html>
