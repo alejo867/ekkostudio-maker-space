@@ -1,53 +1,59 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booth Layout</title>
-    <style>
-        /* General Styles */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-        .booth {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            flex-direction: column;
-            position: relative;
-            width: 100%;
-            height: 100vh;
-        }
-        .station {
-            width: 150px;
-            height: 150px;
-            background: linear-gradient(145deg, #ffffff, #e6e6e6);
-            box-shadow: 5px 5px 15px #b8b8b8, -5px -5px 15px #ffffff;
-            margin: 20px;
-            transform: rotate(90deg);
-            position: relative;
-        }
-        .aisle {
-            width: 100%;
-            height: 100%;
-            background-color: transparent;
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 2px dashed #ccc;
-        }
-    </style>
+    <title>3D Maker Space</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-    <div class="booth">
-        <div class="aisle"></div>
-        <div class="station" style="background-color: #f0f0f0;">Station 1</div>
-        <div class="station" style="background-color: #e8e8e8;">Station 2</div>
-        <div class="station" style="background-color: #fff4e6;">Station 3</div>
-        <div class="station" style="background-color: #e6f7ff;">Station 4</div>
-    </div>
+    <div id="makerSpaceContainer" style="width: 100%; height: 100vh;"></div>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('makerSpaceContainer').appendChild(renderer.domElement);
+
+        // Aisle
+        const aisleGeometry = new THREE.BoxGeometry(2, 1, 10);
+        const aisleMaterial = new THREE.MeshBasicMaterial({color: 0xCCCCCC});
+        const aisle = new THREE.Mesh(aisleGeometry, aisleMaterial);
+        aisle.position.z = 0;
+        scene.add(aisle);
+
+        // Stations
+        const stations = [
+            { name: '3D Printing', position: [-4.0, 0, 0], rotation: Math.PI / 2 },
+            { name: 'Clay Jewelry', position: [2.0, 0, 0], rotation: Math.PI / 2 },
+            { name: 'Cricut', position: [0.5, 0, 0], rotation: Math.PI / 2 },
+            { name: 'Candles', position: [2.5, 0, 0], rotation: Math.PI / 2 }
+        ];
+
+        stations.forEach(station => {
+            const stationGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const stationMaterial = new THREE.MeshBasicMaterial({color: 0x008000});
+            const stationMesh = new THREE.Mesh(stationGeometry, stationMaterial);
+            stationMesh.position.set(...station.position);
+            stationMesh.rotation.y = station.rotation;
+            scene.add(stationMesh);
+        });
+
+        // Lighting
+        const light = new THREE.AmbientLight(0x404040);
+        scene.add(light);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(10, 10, 10);
+        scene.add(directionalLight);
+
+        camera.position.z = 5;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
 </body>
 </html>
